@@ -6,7 +6,6 @@ const router = express.Router();
 router.get("/", async (req, res) => {
   try {
     const books = await Book.find().sort({ createdAt: -1 });
-
     res.json({
       count: books.length,
       books,
@@ -18,11 +17,9 @@ router.get("/", async (req, res) => {
     });
   }
 });
-
 router.post("/", async (req, res) => {
   try {
     const { title, author, price, year } = req.body;
-
     const book = await Book.create({
       title,
       author,
