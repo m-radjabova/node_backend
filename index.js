@@ -1,28 +1,51 @@
 import "dotenv/config";
 import cors from "cors";
 import express from "express";
-import mongoose from "mongoose";
-import bookRoutes from "./routes/bookRoutes.js";
-import studentRoutes from "./routes/studentRoutes.js";
+import connectDB from "./config/db.js";
+import ensureDefaultAdmin from "./config/admin.js";
+import { assertJwtConfig } from "./config/env.js";
+import authRoutes from "./routes/authRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
-import productRoutes from "./routes/productRoutes.js";
+import adminRoutes from "./routes/adminRoutes.js";
+import leadRoutes from "./routes/leadRoutes.js";
+import dashboardRoutes from "./routes/dashboardRoutes.js";
+import companyRoutes from "./routes/companyRoutes.js";
+import reportRoutes from "./routes/reportRoutes.js";
+import calendarRoutes from "./routes/calendarRoutes.js";
+import taskRoutes from "./routes/taskRoutes.js";
+import { notFound, errorHandler } from "./middleware/errorMiddleware.js";
 
 const app = express();
 const PORT = process.env.PORT || 8000;
 
-app.use(cors());
+app.use(cors({ exposedHeaders: ["x-auth-token"] }));
 app.use(express.json());
 
-mongoose
-  .connect(process.env.MONGO_URI)
-  .then(() => console.log("MongoDB ulandi ✅"))
-  .catch((error) => console.log(error));
-
-app.use("/books", bookRoutes);
-app.use("/students", studentRoutes);
+app.get("/health", (_req, res) => res.json({ status: "ok" }));
+app.use("/auth", authRoutes);
 app.use("/users", userRoutes);
-app.use("/products", productRoutes);
+app.use("/admin", adminRoutes);
+app.use("/leads", leadRoutes);
+app.use("/dashboard", dashboardRoutes);
+app.use("/companies", companyRoutes);
+app.use("/reports", reportRoutes);
+app.use("/calendar", calendarRoutes);
+app.use("/tasks", taskRoutes);
+app.use(notFound);
+app.use(errorHandler);
 
-app.listen(PORT, () => {
-  console.log(`Server ${PORT}-portda ishlayapti 🚀`);
-});
+const startServer = async () => {
+  try {
+    assertJwtConfig();
+    await connectDB();
+    await ensureDefaultAdmin();
+    app.listen(PORT, () => console.log(`Server ${PORT}-portda ishlayapti 🚀`));
+  } catch (error) {
+    console.error(`Server ishga tushmadi: ${error.message}`);
+    process.exit(1);
+  }
+};
+
+startServer();
+
+export default app;
