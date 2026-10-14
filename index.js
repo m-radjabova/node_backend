@@ -21,7 +21,13 @@ const PORT = process.env.PORT || 8000;
 app.use(cors({ exposedHeaders: ["x-auth-token"] }));
 app.use(express.json());
 
-app.get("/health", (_req, res) => res.json({ status: "ok" }));
+const healthResponse = (_req, res) =>
+  res.json({ status: "ok", service: "CRM API" });
+
+// Render standart health check uchun ildiz manzilga so'rov yuborishi mumkin.
+// Shu sabab `/` ham, aniq health endpoint ham muvaffaqiyatli javob qaytaradi.
+app.get("/", healthResponse);
+app.get("/health", healthResponse);
 app.use("/auth", authRoutes);
 app.use("/users", userRoutes);
 app.use("/admin", adminRoutes);

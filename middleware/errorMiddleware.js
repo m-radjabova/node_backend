@@ -14,11 +14,14 @@ export const notFound = (req, res, next) => {
 
 // 2. XATOLARNI USHLASH
 export const errorHandler = (error, req, res, next) => {
-  // Xatoni terminalda ko'rsatish
-  console.error(error);
-
   // Xatolik statusi
   const status = error.statusCode || 500;
+
+  // 404 odatiy holat bo'lishi mumkin (masalan, bot yoki noto'g'ri URL).
+  // Faqat server xatolarini stack trace bilan log qilamiz.
+  if (status >= 500) {
+    console.error(error);
+  }
 
   // Xatolik xabari
   let message = error.message || "Server xatosi";
