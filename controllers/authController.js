@@ -16,7 +16,9 @@ export const register = async (req, res, next) => {
     const oldUser = await User.findOne({ email });
 
     if (oldUser) {
-      return res.status(409).json({ message: "Email band" });
+      return res.status(409).json({
+        message: "Bu email manzil bilan hisob allaqachon mavjud",
+      });
     }
 
     const passwordHash = await hashPassword(password);
@@ -41,7 +43,9 @@ export const register = async (req, res, next) => {
 
   } catch (error) {
     if (error.code === 11000) {
-      return res.status(409).json({ message: "Email band" });
+      return res.status(409).json({
+        message: "Bu email manzil bilan hisob allaqachon mavjud",
+      });
     }
     next(error);
   }
@@ -57,13 +61,13 @@ export const login = async (req, res, next) => {
       .select("+passwordHash +refreshTokens");
 
     if (!user || !user.isActive) {
-      return res.status(401).json({ message: "Email yoki parol xato" });
+      return res.status(401).json({ message: "Email yoki parol noto'g'ri" });
     }
 
     const isMatch = await verifyPassword(password, user.passwordHash);
 
     if (!isMatch) {
-      return res.status(401).json({ message: "Email yoki parol xato" });
+      return res.status(401).json({ message: "Email yoki parol noto'g'ri" });
     }
 
     const tokens = await issueTokens(user);
