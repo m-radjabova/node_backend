@@ -2,7 +2,6 @@ import "dotenv/config";
 import cors from "cors";
 import express from "express";
 import connectDB from "./config/db.js";
-import ensureDefaultAdmin from "./config/admin.js";
 import { assertJwtConfig } from "./config/env.js";
 import authRoutes from "./routes/authRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
@@ -24,8 +23,6 @@ app.use(express.json());
 const healthResponse = (_req, res) =>
   res.json({ status: "ok", service: "CRM API" });
 
-// Render standart health check uchun ildiz manzilga so'rov yuborishi mumkin.
-// Shu sabab `/` ham, aniq health endpoint ham muvaffaqiyatli javob qaytaradi.
 app.get("/", healthResponse);
 app.get("/health", healthResponse);
 app.use("/auth", authRoutes);
@@ -44,7 +41,6 @@ const startServer = async () => {
   try {
     assertJwtConfig();
     await connectDB();
-    await ensureDefaultAdmin();
     app.listen(PORT, () => console.log(`Server ${PORT}-portda ishlayapti 🚀`));
   } catch (error) {
     console.error(`Server ishga tushmadi: ${error.message}`);

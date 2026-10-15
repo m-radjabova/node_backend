@@ -1,6 +1,6 @@
 
-import jwt from "jsonwebtoken";
 import User from "../models/User.js";
+import { decodeToken } from "../utils/security.js";
 
 
 // 1. FOYDALANUVCHINI TEKSHIRISH
@@ -27,10 +27,7 @@ export const authenticate = async (req, res, next) => {
     }
 
     // Tokenni tekshirish
-    const payload = jwt.verify(
-      token,
-      process.env.JWT_ACCESS_SECRET
-    );
+    const payload = decodeToken(token, process.env.JWT_ACCESS_SECRET);
 
     // Token ichidagi ID orqali userni topish
     const user = await User.findById(payload.sub);

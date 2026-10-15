@@ -1,12 +1,10 @@
 
-import bcrypt from "bcrypt";
-import jwt from "jsonwebtoken";
-
+import { accessTokenExpiresIn, refreshTokenExpiresIn } from "../config/env.js";
 import {
-  assertJwtConfig,
-  accessTokenExpiresIn,
-  refreshTokenExpiresIn,
-} from "../config/env.js";
+  createToken,
+  hashPassword,
+  verifyPassword,
+} from "./security.js";
 
 
 // 1. TOKEN TUGASH SANASINI HISOBLASH
@@ -39,45 +37,32 @@ const getExpiryDate = (expiresIn) => {
 
 // 2. ACCESS TOKEN YARATISH
 export const createAccessToken = (user) => {
-  // JWT sozlamalarini tekshirish
-  assertJwtConfig();
-
-  const accessToken = jwt.sign(
+  return createToken(
+    { sub: user._id.toString(), role: user.role },
     {
-      role: user.role,
-    },
-    process.env.JWT_ACCESS_SECRET,
-    {
-      subject: user._id.toString(),
+      secret: process.env.JWT_ACCESS_SECRET,
       expiresIn: accessTokenExpiresIn,
-    }
+    },
   );
-
-  return accessToken;
 };
 
 
 // 3. REFRESH TOKEN YARATISH
 export const createRefreshToken = (user) => {
-  assertJwtConfig();
-
-  const refreshToken = jwt.sign(
-    {},
-    process.env.JWT_REFRESH_SECRET,
+  return createToken(
+    { sub: user._id.toString() },
     {
-      subject: user._id.toString(),
+      secret: process.env.JWT_REFRESH_SECRET,
       expiresIn: refreshTokenExpiresIn,
-    }
+    },
   );
-
-  return refreshToken;
 };
 
 
 // 4. REFRESH TOKENNI BAZAGA SAQLASH
 export const addRefreshToken = async (user, refreshToken) => {
   // Tokenni hash qilish
-  const tokenHash = await bcrypt.hash(refreshToken, 12);
+  const tokenHash = await hashPassword(refreshToken);
 
   const now = new Date();
 
@@ -112,10 +97,7 @@ export const findRefreshToken = async (user, refreshToken) => {
     // Token muddati tugamagan bo'lsa
     if (item.expiresAt > now) {
       // Tokenni tekshirish
-      const isMatch = await bcrypt.compare(
-        refreshToken,
-        item.tokenHash
-      );
+      const isMatch = await verifyPassword(refreshToken, item.tokenHash);
 
       if (isMatch) {
         return item;
@@ -133,10 +115,7 @@ export const removeRefreshToken = async (user, refreshToken) => {
   const remainingTokens = [];
 
   for (const item of user.refreshTokens) {
-    const isMatch = await bcrypt.compare(
-      refreshToken,
-      item.tokenHash
-    );
+    const isMatch = await verifyPassword(refreshToken, item.tokenHash);
 
     // Mos kelmagan tokenlarni qoldirish
     if (!isMatch) {

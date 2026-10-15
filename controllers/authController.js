@@ -1,7 +1,6 @@
-
-import bcrypt from "bcrypt";
-import jwt from "jsonwebtoken";
 import User from "../models/User.js";
+import { decodeToken, hashPassword, verifyPassword } from "../utils/security.js";
+
 import {
   findRefreshToken,
   issueTokens,
@@ -9,117 +8,69 @@ import {
 } from "../utils/tokens.js";
 
 
-// 1. RO'YXATDAN O'TISH
+// 1. REGISTER
 export const register = async (req, res, next) => {
   try {
     const { fullName, email, password, role } = req.body;
 
-    // Email oldin ro'yxatdan o'tganmi?
     const oldUser = await User.findOne({ email });
 
     if (oldUser) {
-      return res.status(409).json({
-        message: "Bu email allaqachon ro'yxatdan o'tgan",
-      });
+      return res.status(409).json({ message: "Email band" });
     }
-    // Parolni shifrlash (hashlash)
-    const hashedPassword = await bcrypt.hash(password, 12);
 
-    // Yangi foydalanuvchi yaratish
+    const passwordHash = await hashPassword(password);
+
     const user = await User.create({
       fullName,
       email,
-      passwordHash: hashedPassword,
+      passwordHash,
       role: role === "manager" ? "manager" : "user",
     });
 
-    // Token yaratish uchun refreshTokens maydonini olish
     const tokenUser = await User.findById(user._id)
       .select("+refreshTokens");
 
     const tokens = await issueTokens(tokenUser);
 
-    // Frontend JSON'dagi tokens orqali ishlashda davom etadi; shu bilan birga
-    // klassik API mijozlari tokenni x-auth-token headeridan ham olishi mumkin.
     res.set("x-auth-token", tokens.accessToken).status(201).json({
-      message: "Ro'yxatdan o'tish muvaffaqiyatli",
-      user: {
-        id: user._id,
-        fullName: user.fullName,
-        email: user.email,
-        phone: user.phone || null,
-        jobTitle: user.jobTitle || null,
-        company: user.company || null,
-        language: user.language || null,
-        role: user.role,
-        createdAt: user.createdAt,
-      },
+      message: "Ro'yxatdan o'tdingiz",
+      user: getUserData(user),
       tokens,
     });
 
   } catch (error) {
     if (error.code === 11000) {
-      return res.status(409).json({
-        message: "Bu qiymat boshqa foydalanuvchida band",
-      });
+      return res.status(409).json({ message: "Email band" });
     }
-
     next(error);
   }
 };
 
 
-// 2. TIZIMGA KIRISH
+// 2. LOGIN
 export const login = async (req, res, next) => {
   try {
     const { email, password } = req.body;
 
-    // Email orqali foydalanuvchini topish
     const user = await User.findOne({ email })
       .select("+passwordHash +refreshTokens");
 
-    // Foydalanuvchi mavjud emas
-    if (!user) {
-      return res.status(401).json({
-        message: "Email yoki parol noto'g'ri",
-      });
+    if (!user || !user.isActive) {
+      return res.status(401).json({ message: "Email yoki parol xato" });
     }
 
-    // Foydalanuvchi faol emas
-    if (!user.isActive) {
-      return res.status(401).json({
-        message: "Email yoki parol noto'g'ri",
-      });
+    const isMatch = await verifyPassword(password, user.passwordHash);
+
+    if (!isMatch) {
+      return res.status(401).json({ message: "Email yoki parol xato" });
     }
 
-    // Parolni tekshirish
-    const correctPassword = await bcrypt.compare(
-      password,
-      user.passwordHash
-    );
-
-    if (!correctPassword) {
-      return res.status(401).json({
-        message: "Email yoki parol noto'g'ri",
-      });
-    }
-
-    // Token yaratish
     const tokens = await issueTokens(user);
 
     res.set("x-auth-token", tokens.accessToken).json({
-      message: "Kirish muvaffaqiyatli",
-      user: {
-        id: user._id,
-        fullName: user.fullName,
-        email: user.email,
-        phone: user.phone || null,
-        jobTitle: user.jobTitle || null,
-        company: user.company || null,
-        language: user.language || null,
-        role: user.role,
-        createdAt: user.createdAt,
-      },
+      message: "Tizimga kirdingiz",
+      user: getUserData(user),
       tokens,
     });
 
@@ -129,78 +80,54 @@ export const login = async (req, res, next) => {
 };
 
 
-// 3. TOKENNI YANGILASH
+// 3. REFRESH TOKEN
 export const refresh = async (req, res, next) => {
   try {
     const { refreshToken } = req.body;
 
-    // Tokenni tekshirish
-    const payload = jwt.verify(
-      refreshToken,
-      process.env.JWT_REFRESH_SECRET
-    );
+    const decoded = decodeToken(refreshToken, process.env.JWT_REFRESH_SECRET);
 
-    // Token ichidagi ID orqali userni topish
-    const user = await User.findById(payload.sub)
+    const user = await User.findById(decoded.sub)
       .select("+refreshTokens");
 
     if (!user || !user.isActive) {
-      return res.status(401).json({
-        message: "Foydalanuvchi topilmadi yoki faol emas",
-      });
+      return res.status(401).json({ message: "Ruxsat yo'q" });
     }
 
-    // Token bazada mavjudligini tekshirish
-    const tokenExists = await findRefreshToken(
-      user,
-      refreshToken
-    );
+    const exists = await findRefreshToken(user, refreshToken);
 
-    if (!tokenExists) {
-      return res.status(401).json({
-        message: "Refresh token noto'g'ri",
-      });
+    if (!exists) {
+      return res.status(401).json({ message: "Token xato" });
     }
 
-    // Eski tokenni o'chirish
     await removeRefreshToken(user, refreshToken);
 
-    // Yangi token yaratish
     const tokens = await issueTokens(user);
 
     res.json({ tokens });
 
   } catch (error) {
-    return res.status(401).json({
-      message: "Refresh token noto'g'ri yoki muddati tugagan",
-    });
+    res.status(401).json({ message: "Token xato yoki muddati tugagan" });
   }
 };
 
 
-// 4. TIZIMDAN CHIQISH
+// 4. LOGOUT
 export const logout = async (req, res, next) => {
   try {
     const { refreshToken } = req.body;
 
-    // Tokenni tekshirish
     try {
-      const payload = jwt.verify(
-        refreshToken,
-        process.env.JWT_REFRESH_SECRET
-      );
+      const decoded = decodeToken(refreshToken, process.env.JWT_REFRESH_SECRET);
 
-      // Foydalanuvchini topish
-      const user = await User.findById(payload.sub)
+      const user = await User.findById(decoded.sub)
         .select("+refreshTokens");
 
-      // Tokenni bazadan o'chirish
       if (user) {
         await removeRefreshToken(user, refreshToken);
       }
-
     } catch (error) {
-      // Token yaroqsiz bo'lsa ham logout muvaffaqiyatli
+      // Token xato bo'lsa ham chiqishga ruxsat
     }
 
     res.status(204).send();
@@ -209,3 +136,17 @@ export const logout = async (req, res, next) => {
     next(error);
   }
 };
+
+
+// USER MA'LUMOTLARINI QAYTARISH
+const getUserData = (user) => ({
+  id: user._id,
+  fullName: user.fullName,
+  email: user.email,
+  phone: user.phone || null,
+  jobTitle: user.jobTitle || null,
+  company: user.company || null,
+  language: user.language || null,
+  role: user.role,
+  createdAt: user.createdAt,
+});

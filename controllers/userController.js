@@ -1,6 +1,6 @@
 
-import bcrypt from "bcrypt";
 import User from "../models/User.js";
+import { hashPassword, verifyPassword } from "../utils/security.js";
 
 
 // 1. PROFIL MA'LUMOTLARINI OLISH
@@ -127,10 +127,7 @@ export const changePassword = async (req, res, next) => {
     }
 
     // Joriy parolni tekshirish
-    const isCorrect = await bcrypt.compare(
-      currentPassword,
-      user.passwordHash
-    );
+    const isCorrect = await verifyPassword(currentPassword, user.passwordHash);
 
     if (!isCorrect) {
       return res.status(400).json({
@@ -139,10 +136,7 @@ export const changePassword = async (req, res, next) => {
     }
 
     // Yangi parolni hash qilish
-    const hashedPassword = await bcrypt.hash(
-      newPassword,
-      12
-    );
+    const hashedPassword = await hashPassword(newPassword);
 
     // Yangi parolni saqlash
     user.passwordHash = hashedPassword;

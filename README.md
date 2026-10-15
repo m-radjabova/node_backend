@@ -11,7 +11,6 @@ Node.js, Express va MongoDB (MongoDB Atlas/Neon emas) asosidagi CRM autentifikat
 
 `GET /health` server holatini tekshiradi.
 
-Server birinchi marta ishga tushganda `.env` dagi `ADMIN_EMAIL` va `ADMIN_PASSWORD` bilan admin yaratadi. U mavjud bo'lsa qayta yaratilmaydi.
 
 Demo ma'lumotlarni qo‘shish uchun `npm run seed` ishlating. U uchta manager va ularga tegishli alohida leadlarni qo‘shadi. Demo managerlarning paroli: `Manager123!`. Scriptni qayta ishga tushirish dublikat lead yoki user yaratmaydi.
 

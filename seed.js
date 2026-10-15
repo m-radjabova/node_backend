@@ -1,8 +1,7 @@
 import "dotenv/config";
-import bcrypt from "bcrypt";
 import mongoose from "mongoose";
 import connectDB from "./config/db.js";
-import ensureDefaultAdmin from "./config/admin.js";
+import { hashPassword } from "./utils/security.js";
 import User from "./models/User.js";
 import Lead from "./models/Lead.js";
 import Company from "./models/Company.js";
@@ -312,7 +311,7 @@ const ensureUser = async (userData) => {
 
   const user = await User.create({
     ...userData,
-    passwordHash: await bcrypt.hash(demoPassword, 12),
+    passwordHash: await hashPassword(demoPassword),
   });
   return { user, created: true, updated: false };
 };
@@ -320,7 +319,6 @@ const ensureUser = async (userData) => {
 const seed = async () => {
   try {
     await connectDB();
-    await ensureDefaultAdmin();
 
     let usersCreated = 0;
     let usersUpdated = 0;
